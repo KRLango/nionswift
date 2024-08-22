@@ -50,6 +50,7 @@ from nion.utils import Observable
 from nion.utils import ReferenceCounting
 from nion.utils import Registry
 from nion.utils import Validator
+from nion.utils.Converter import FT, TT
 
 if typing.TYPE_CHECKING:
     from nion.swift import Application
@@ -879,6 +880,113 @@ class ChangeDisplayLayerDisplayDataChannelCommand(Undo.UndoableCommand):
     def can_merge(self, command: Undo.UndoableCommand) -> bool:
         return isinstance(command, self.__class__) and bool(self.command_id) and self.command_id == command.command_id and self.__display_item_uuid == command.__display_item_uuid
 
+
+class LinePlotDisplayLayerModel(Observable.Observable):
+    def __init__(self, display_item: DisplayItem.DisplayItem, display_layer: DisplayItem.DisplayLayer, index: int) -> None:
+        super().__init__()
+        self.__display_item = display_item
+        self.__display_layer = display_layer
+        self.__index = index
+
+    @property
+    def index(self) -> int:
+        return self.__index
+
+    @property
+    def label(self) -> str:
+        return self.__display_layer.label
+
+    @property
+    def data_index(self) -> typing.Optional[int]:
+        index = self.__display_item.display_layers.index(self.__display_layer)
+        display_data_channel = self.__display_item.get_display_layer_display_data_channel(index)
+        return self.__display_item.display_data_channels.index(display_data_channel) if display_data_channel else None
+
+    @property
+    def data_row(self) -> typing.Optional[int]:
+        return self.__display_layer.data_row
+
+
+class IndexToStringConverter(Converter.ConverterLike[int, str]):
+    def __init__(self) -> None:
+        super().__init__()
+        self.__prefix = _("Layer") + " "
+        self.__suffix = ":"
+
+    def convert(self, value: typing.Optional[int]) -> typing.Optional[str]:
+        if value is None:
+            return None
+        return self.__prefix + str(value) + self.__suffix
+
+    def convert_back(self, formatted_value: typing.Optional[str]) -> typing.Optional[int]:
+        if formatted_value is None:
+            return None
+        value = formatted_value.removeprefix(self.__prefix)
+        value = value.removesuffix(self.__suffix)
+        return int(value)
+
+
+class LinePlotDisplayLayerHandler(Declarative.Handler):
+    def __init__(self, line_plot_display_layer_model: LinePlotDisplayLayerModel) -> None:
+        super().__init__()
+
+        self._line_plot_display_layer_model = line_plot_display_layer_model
+        self._index_to_string_converter = IndexToStringConverter()
+        self._int_to_string_converter = Converter.IntegerToStringConverter()
+        u = Declarative.DeclarativeUI()
+
+        self.ui_view = u.create_column(
+            u.create_row(
+                u.create_label(text="@binding(_line_plot_display_layer_model.index, converter=_index_to_string_converter)"),
+                u.create_line_edit(text="@binding(_line_plot_display_layer_model.label)"),
+                u.create_spacing(12)
+            ),
+            u.create_row(
+                u.create_push_button(text="\N{UPWARDS WHITE ARROW}", on_clicked="_move_layer_forward"),
+                u.create_push_button(text="\N{DOWNWARDS WHITE ARROW}", on_clicked="_move_layer_backward"),
+                u.create_stretch(),
+                u.create_push_button(text="\N{PLUS SIGN}", on_clicked="_add_layer"),
+                u.create_push_button(text="\N{MINUS SIGN}", on_clicked="_remove_layer"),
+                u.create_spacing(12),
+            ),
+            u.create_row(
+                u.create_label(text=_("Data Index")),
+                u.create_line_edit(text="@binding(_line_plot_display_layer_model.data_index, converter=_int_to_string_converter)", width=36),
+                u.create_label(text=_("Row")),
+                u.create_line_edit(text="@binding(_line_plot_display_layer_model._data_row, converter=_int_to_string_converter)", width=36),
+                u.create_stretch()
+            ),
+            u.create_row(
+                u.create_label(text=_("Fill Color"), width=80),
+                spacing=8
+            )
+        )
+
+    def _move_layer_forward(self) -> None:
+        return
+
+    def _move_layer_backward(self) -> None:
+        return
+
+    def _add_layer(self) -> None:
+        return
+
+    def _remove_layer(self) -> None:
+        return
+
+
+class LinePlotDisplayLayersSectionHandler(Declarative.Handler):
+    def __init__(self, display_itme: DisplayItem.DisplayItem) -> None:
+        super().__init__()
+        self.__display_itme = display_itme
+        self.update_display_layers_section()
+
+    def update_display_layers_section(self):
+        self._line_plot_display_layer_models = [LinePlotDisplayLayerModel(display_layer, index) for index, display_layer in enumerate(self.__display_itme.display_layers)]
+
+    def create_handler(self, component_id: str, container: typing.Optional[Symbolic.ComputationVariable] = None, item: typing.Any = None, **kwargs: typing.Any) -> typing.Optional[Declarative.HandlerLike]:
+        line_plot_display_layer_model = typing.cast(LinePlotDisplayLayerModel, item)
+        return LinePlotDisplayLayerHandler(line_plot_display_layer_model)
 
 class LinePlotDisplayLayersInspectorSection(InspectorSection):
     def __init__(self, document_controller: DocumentController.DocumentController, display_item: DisplayItem.DisplayItem) -> None:

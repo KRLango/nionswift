@@ -1596,13 +1596,9 @@ class ImageCanvasItem(DisplayCanvasItem.DisplayCanvasItem):
         return True
 
     def wheel_changed(self, x: int, y: int, dx: int, dy: int, is_horizontal: bool) -> bool:
-        delegate = self.delegate
-        if delegate and self.__mouse_in:
-            dx = dx if is_horizontal else 0
-            dy = dy if not is_horizontal else 0
-            command = delegate.create_change_display_command(command_id="image_position", is_mergeable=True)
-            self._update_image_canvas_position(Geometry.FloatSize(-dy, -dx))
-            delegate.push_undo_command(command)
+        if self.__mouse_in:
+            delta = dx if is_horizontal else dy
+            self.apply_fixed_zoom(delta > 0, Geometry.IntPoint(y=y, x=x))
             return True
         return False
 
